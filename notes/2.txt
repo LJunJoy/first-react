@@ -1,0 +1,560 @@
+REACT
+如果混用“合成事件”和“原生事件”，比如一种常见的场景是用原生事件在 document 
+上绑定，然后在组件里面绑定的合成事件想要通过 e.stopPropagation() 来阻止事件冒泡到 
+document，这时候是行不通的，参见 Event delegation，因为 e.stopPropagation 是内部“合成事件” 
+层面的，解决方法是要用 e.nativeEvent.stopImmediatePropagation()
+
+”合成事件“ 的 event 对象只在当前 event loop 有效，比如你想在事件里面调用一个 promise，在 resolve 之后去拿 event 对象会拿不到（并且没有错误抛出）：
+
+handleClick(e) {
+  promise.then(() => doSomethingWith(e));
+}
+详情见 Event pooling 说明。
+
+参数传递
+给事件处理函数传递额外参数的方式：bind(this, arg1, arg2, ...)
+render: function() {
+    return <p onClick={this.handleClick.bind(this, 'extra param')}>;
+},
+handleClick: function(param, event) {
+    // handle click
+}
+
+另外一种方式就是通过在要引用的 DOM 元素上面设置一个 ref 属性指定一个名称，然后通过 this.refs.name 来访问对应的 DOM 元素。
+
+比如有一种情况是必须直接操作 DOM 来实现的，你希望一个 <input/> 元素在你清空它的值时 focus，你没法仅仅靠 state 来实现这个功能。
+
+class App extends Component {
+  constructor() {
+    return { userInput: '' };
+  }
+
+  handleChange(e) {
+    this.setState({ userInput: e.target.value });
+  }
+
+  clearAndFocusInput() {
+    this.setState({ userInput: '' }, () => {
+      this.refs.theInput.focus();
+    });
+  }
+
+  render() {
+    return (
+      <div>
+        <div onClick={this.clearAndFocusInput.bind(this)}>
+          Click to Focus and Reset
+        </div>
+        <input
+          ref="theInput"
+          value={this.state.userInput}
+          onChange={this.handleChange.bind(this)}
+        />
+      </div>
+    );
+  }
+}
+如果 ref 是设置在原生 HTML 元素上，它拿到的就是 DOM 元素，如果设置在自定义组件上，它拿到的就是组件实例，这时候就需要通过 findDOMNode 来拿到组件的 DOM 元素。
+
+因为无状态组件没有实例，所以 ref 不能设置在无状态组件上，一般来说这没什么问题，因为无状态组件没有实例方法，不需要 ref 去拿实例调用相关的方法，但是如果想要拿无状态组件的 DOM 元素的时候，就需要用一个状态组件封装一层，然后通过 ref 和 findDOMNode 去获取。
+
+阻止组件渲染
+在极少数情况下，你可能希望隐藏组件，即使它被其他组件渲染。让 render 方法返回 null 而不是它的渲染结果即可实现。
+
+redux
+
+三个基本原则
+整个应用只有唯一一个可信数据源，也就是只有一个 Store
+State 只能通过触发 Action 来更改
+State 的更改必须写成纯函数，也就是每次更改总是返回一个新的 State，在 Redux 里这种函数称为 Reducer
+
+Actions
+Action 很简单，就是一个单纯的包含 { type, payload } 的对象，type 是一个常量用来标示动作类型，payload 是这个动作携带的数据。Action 需要通过 store.dispatch() 方法来发送。
+比如一个最简单的 action：
+{
+  type: 'ADD_TODO',
+  text: 'Build my first Redux app'
+}
+一般来说，会使用函数（Action Creators）来生成 action，这样会有更大的灵活性，Action Creators 是一个 pure function，它最后会返回一个 action 对象：
+function addTodo(text) {
+  return {
+    type: 'ADD_TODO',
+    text
+  }
+}
+要触发一个动作只要调用 dispatch(addTodo(text))
+稍后会讲到如何拿到 store.dispatch
+
+
+Reducers
+Reducer 用来处理 Action 触发的对状态树的更改。
+所以一个 reducer 函数会接受 oldState 和 action 两个参数，返回一个新的 state：(oldState, action) => newState。一个简单的 reducer 可能类似这样：
+const initialState = {
+  a: 'a',
+  b: 'b'
+};
+function someApp(state = initialState, action) {
+  switch (action.type) {
+    case 'CHANGE_A':
+      return { ...state, a: 'Modified a' };
+    case 'CHANGE_B':
+      return { ...state, b: action.payload };
+    default:
+      return state
+  }
+}
+值得注意的有两点：
+我们用到了 object spread 语法 确保不会更改到 oldState 而是返回一个 newState
+对于不需要处理的 action，直接返回 oldState
+
+Reducer 也是 pure function，这点非常重要，所以绝对不要在 reducer 里面做一些引入 side-effects 的事情，比如：
+直接修改 state 参数对象
+请求 API
+调用不纯的函数，比如 Data.now() Math.random()
+因为 Redux 里面只有一个 Store，对应一个 State 状态，所以整个 State 对象就是由一个 reducer 函数管理，但是如果所有的状态更改逻辑都放在这一个 reducer 里面，显然会变得越来越巨大，越来越难以维护。得益于纯函数的实现，我们只需要稍微变通一下，让状态树上的每个字段都有一个 reducer 函数来管理就可以拆分成很小的 reducer 了：
+function someApp(state = {}, action) {
+  return {
+    a: reducerA(state.a, action),
+    b: reducerB(state.b, action)
+  };
+}
+对于 reducerA 和 reducerB 来说，他们依然是形如：(oldState, action) => newState 的函数，只是这时候的 state 不是整个状态树，而是树上的特定字段，每个 reducer 只需要判断 action，管理自己关心的状态字段数据就好了。
+
+Redux 提供了一个工具函数 combineReducers 来简化这种 reducer 合并：
+import { combineReducers } from 'redux';
+const someApp = combineReducers({
+  a: reducerA,
+  b: reducerB
+});
+如果 reducer 函数名字和字段名字相同，利用 ES6 的 Destructuring 可以进一步简化成：combineReducers({ a, b })
+象 someApp 这种管理整个 State 的 reducer，可以称为 root reducer。
+
+
+Store
+现在有了 Action 和 Reducer，Store 的作用就是连接这两者，Store 的作用有这么几个：
+Hold 住整个应用的 State 状态树
+提供一个 getState() 方法获取 State
+提供一个 dispatch() 方法发送 action 更改 State
+提供一个 subscribe() 方法注册回调函数监听 State 的更改
+
+创建一个 Store 很容易，将 root reducer 函数传递给 createStore 方法即可：
+
+import { createStore } from 'redux';
+import someApp from './reducers';
+let store = createStore(someApp);
+// 你也可以额外指定一个初始 State（initialState），这对于服务端渲染很有用
+// let store = createStore(someApp, window.STATE_FROM_SERVER);
+
+现在我们就拿到了 store.dispatch，可以用来分发 action 了：
+let unsubscribe = store.subscribe(() => console.log(store.getState()));
+// Dispatch
+store.dispatch({ type: 'CHANGE_A' });
+store.dispatch({ type: 'CHANGE_B', payload: 'Modified b' });
+// Stop listening to state updates
+unsubscribe();
+
+Data Flow
+以上提到的 store.dispatch(action) -> reducer(state, action) -> store.getState() 其实就构成了一个“单向数据流”，我们再来总结一下。
+1. 调用 store.dispatch(action)
+Action 是一个包含 { type, payload } 的对象，它描述了“发生了什么”，比如：
+{ type: 'LIKE_ARTICLE', articleID: 42 }
+{ type: 'FETCH_USER_SUCCESS', response: { id: 3, name: 'Mary' } }
+{ type: 'ADD_TODO', text: 'Read the Redux docs.' }
+你可以在任何地方调用 store.dispatch(action)，比如组件内部，Ajax 回调函数里面等等。
+
+2. Action 会触发给 Store 指定的 root reducer
+root reducer 会返回一个完整的状态树，State 对象上的各个字段值可以由各自的 reducer 函数处理并返回新的值。
+reducer 函数接受 (state, action) 两个参数
+reducer 函数判断 action.type 然后处理对应的 action.payload 数据来更新并返回一个新的 state
+
+3. Store 会保存 root reducer 返回的状态树
+新的 State 会替代旧的 State，然后所有 store.subscribe(listener) 注册的回调函数会被调用，在回调函数里面可以通过 store.getState() 拿到新的 State。
+这就是 Redux 的运作流程，接下来看如何在 React 里面使用 Redux。
+http://caibaojian.com/react/usage-with-react.html
+
+Redux
+基本概念
+
+3.1 Store
+Store 就是保存数据的地方，你可以把它看成一个容器。整个应用只能有一个 Store。
+Redux 提供createStore这个函数，用来生成 Store。
+import { createStore } from 'redux';
+let { subscribe, dispatch, getState } = createStore(reducer);
+
+3.2 State
+Store对象包含所有数据。如果想得到某个时点的数据，就要对 Store 生成快照。这种时点的数据集合，就叫做 State。
+当前时刻的 State，可以通过store.getState()拿到。Redux 规定， 一个 State 对应一个 View。只要 State 相同，View 就相同。
+
+3.3 Action
+State 的变化，会导致 View 的变化。但是，用户接触不到 State，只能接触到 View。所以，State 的变化必须是 View 导致的。Action 就是 View 发出的通知，表示 State 应该要发生变化了。
+Action 是一个对象。其中的type属性是必须的，表示 Action 的名称。
+const action = {
+  type: 'ADD_TODO',
+  payload: 'Learn Redux'
+};
+
+3.4 Action Creator
+View 要发送多少种消息，就会有多少种 Action。如果都手写，会很麻烦。可以定义一个函数来生成 Action，这个函数就叫 Action Creator。
+const ADD_TODO = '添加 TODO';
+function addTodo(text) {
+  return {
+    type: ADD_TODO,
+    text
+  }
+}
+const action = addTodo('Learn Redux');
+
+3.5 store.dispatch()
+store.dispatch()是 View 发出 Action 的唯一方法。
+
+3.6 Reducer
+Store 收到 Action 以后，必须给出一个新的 State，这样 View 才会发生变化。这种 State 的计算过程就叫做 Reducer。
+Reducer 是一个函数，它接受 Action 和当前 State 作为参数，返回一个新的 State。
+const reducer = function (state = defaultState, action) {
+  // ...
+  return new_state;
+};
+整个应用的初始状态，可以作为 State 的默认值。
+
+我们可以把 Reducer 函数拆分。不同的函数负责处理不同属性，最终把它们合并成一个大的 Reducer 即可。
+const chatReducer = (state = defaultState, action = {}) => {
+  return {
+    chatLog: chatLog(state.chatLog, action),
+    statusMessage: statusMessage(state.statusMessage, action),
+    userName: userName(state.userName, action)
+  }
+};
+Redux 提供了一个 combineReducers 方法，用于 Reducer 的拆分。你只要定义各个子 Reducer 函数，然后用这个方法，将它们合成一个大的 Reducer。
+import { combineReducers } from 'redux';
+const chatReducer = combineReducers({
+  chatLog,
+  statusMessage,
+  userName
+})
+export default todoApp;
+上面的代码通过combineReducers方法将三个子 Reducer 合并成一个大的函数。
+这种写法有一个前提，就是 State 的属性名必须与子 Reducer 同名。如果不同名，就要采用key-value写法。
+
+实际应用中，Reducer 函数不用手动调用，store.dispatch方法会触发 Reducer 的自动执行。为此，Store 需要知道 Reducer 函数，做法就是在生成 Store 的时候，将 Reducer 传入createStore方法。
+import { createStore } from 'redux';
+const store = createStore(reducer);
+
+
+3.8 store.subscribe()
+Store 允许使用store.subscribe方法设置监听函数，一旦 State 发生变化，就自动执行这个函数。
+import { createStore } from 'redux';
+const store = createStore(reducer);
+store.subscribe(listener);
+显然，只要把 View 的更新函数（对于 React 项目，就是组件的render方法或setState方法）放入listen，就会实现 View 的自动渲染。
+
+store.subscribe方法返回一个函数，调用这个函数就可以解除监听。
+let unsubscribe = store.subscribe(() =>
+  console.log(store.getState())
+);
+unsubscribe();
+
+
+React-Redux
+为了方便使用，Redux 的作者封装了一个 React 专用的库 React-Redux，本文主要介绍它。
+这个库是可以选用的。实际项目中，你应该权衡一下，是直接使用 Redux，还是使用 React-Redux。React-Redux需要掌握新的api和组件拆分规范。
+
+
+一、UI 组件
+React-Redux 将所有组件分成两大类：UI 组件（presentational component）和容器组件（container component）。
+UI 组件有以下几个特征。
+只负责 UI 的呈现，不带有任何业务逻辑
+没有状态（即不使用this.state这个变量）
+所有数据都由参数（this.props）提供
+不使用任何 Redux 的 API
+下面就是一个 UI 组件的例子。
+const Title =
+  value => <h1>{value}</h1>;
+因为不含有状态，UI 组件又称为"纯组件"，即它纯函数一样，纯粹由参数决定它的值。
+
+二、容器组件
+容器组件的特征恰恰相反。
+负责管理数据和业务逻辑，不负责 UI 的呈现
+带有内部状态
+使用 Redux 的 API
+总之，只要记住一句话就可以了：UI 组件负责 UI 的呈现，容器组件负责管理数据和逻辑。
+你可能会问，如果一个组件既有 UI 又有业务逻辑，那怎么办？回答是，将它拆分成下面的结构：外面是一个容器组件，里面包了一个UI 组件。前者负责与外部的通信，将数据传给后者，由后者渲染出视图。
+React-Redux 规定，所有的 UI 组件都由用户提供，容器组件则是由 React-Redux 自动生成。也就是说，用户负责视觉层，状态管理则是全部交给它。
+
+三、connect()
+React-Redux 提供connect方法，用于从 UI 组件生成容器组件。connect的意思，就是将这两种组件连起来。
+import { connect } from 'react-redux'
+const VisibleTodoList = connect()(TodoList);
+上面代码中，TodoList是 UI 组件，VisibleTodoList就是由 React-Redux 通过connect方法自动生成的容器组件。
+但是，因为没有定义业务逻辑，上面这个容器组件毫无意义，只是 UI 组件的一个单纯的包装层。为了定义业务逻辑，需要给出下面两方面的信息。
+（1）输入逻辑：外部的数据（即state对象）如何转换为 UI 组件的参数
+（2）输出逻辑：用户发出的动作如何变为 Action 对象，从 UI 组件传出去。
+因此，connect方法的完整 API 如下。
+import { connect } from 'react-redux'
+const VisibleTodoList = connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(TodoList)
+上面代码中，connect方法接受两个参数：mapStateToProps和mapDispatchToProps。它们定义了 UI 组件的业务逻辑。前者负责输入逻辑，即将state映射到 UI 组件的参数（props），后者负责输出逻辑，即将用户对 UI 组件的操作映射成 Action。
+
+四、mapStateToProps()
+mapStateToProps是一个函数。它的作用就是像它的名字那样，建立一个从（外部的）state对象到（UI 组件的）props对象的映射关系。
+作为函数，mapStateToProps执行后应该返回一个对象，里面的每一个键值对就是一个映射。请看下面的例子。
+const mapStateToProps = (state) => {
+  return {
+    todos: getVisibleTodos(state.todos, state.visibilityFilter)
+  }
+}
+上面代码中，mapStateToProps是一个函数，它接受state作为参数，返回一个对象。这个对象有一个todos属性，代表 UI 组件的同名参数，后面的getVisibleTodos也是一个函数，可以从state算出 todos 的值。
+下面就是getVisibleTodos的一个例子，用来算出todos。
+const getVisibleTodos = (todos, filter) => {
+  switch (filter) {
+    case 'SHOW_ALL':
+      return todos
+    case 'SHOW_COMPLETED':
+      return todos.filter(t => t.completed)
+    case 'SHOW_ACTIVE':
+      return todos.filter(t => !t.completed)
+    default:
+      throw new Error('Unknown filter: ' + filter)
+  }
+}
+mapStateToProps会订阅 Store，每当state更新的时候，就会自动执行，重新计算 UI 组件的参数，从而触发 UI 组件的重新渲染。
+mapStateToProps的第一个参数总是state对象，还可以使用第二个参数，代表容器组件的props对象。
+// 容器组件的代码
+//    <FilterLink filter="SHOW_ALL">
+//      All
+//    </FilterLink>
+const mapStateToProps = (state, ownProps) => {
+  return {
+    active: ownProps.filter === state.visibilityFilter
+  }
+}
+使用ownProps作为参数后，如果容器组件的参数发生变化，也会引发 UI 组件重新渲染。
+connect方法可以省略mapStateToProps参数，那样的话，UI 组件就不会订阅Store，就是说 Store 的更新不会引起 UI 组件的更新。
+
+五、mapDispatchToProps()
+mapDispatchToProps是connect函数的第二个参数，用来建立 UI 组件的参数到store.dispatch方法的映射。也就是说，它定义了哪些用户的操作应该当作 Action，传给 Store。它可以是一个函数，也可以是一个对象。
+如果mapDispatchToProps是一个函数，会得到dispatch和ownProps（容器组件的props对象）两个参数。
+const mapDispatchToProps = (
+  dispatch,
+  ownProps
+) => {
+  return {
+    onClick: () => {
+      dispatch({
+        type: 'SET_VISIBILITY_FILTER',
+        filter: ownProps.filter
+      });
+    }
+  };
+}
+从上面代码可以看到，mapDispatchToProps作为函数，应该返回一个对象，该对象的每个键值对都是一个映射，定义了 UI 组件的参数怎样发出 Action。
+如果mapDispatchToProps是一个对象，它的每个键名也是对应 UI 组件的同名参数，键值应该是一个函数，会被当作 Action creator ，返回的 Action 会由 Redux 自动发出。举例来说，上面的mapDispatchToProps写成对象就是下面这样。
+const mapDispatchToProps = {
+  onClick: (filter) => {
+    type: 'SET_VISIBILITY_FILTER',
+    filter: filter
+  };
+}
+
+六、<Provider> 组件
+connect方法生成容器组件以后，需要让容器组件拿到state对象，才能生成 UI 组件的参数。
+一种解决方法是将state对象作为参数，传入容器组件。但是，这样做比较麻烦，尤其是容器组件可能在很深的层级，一级级将state传下去就很麻烦。
+React-Redux 提供Provider组件，可以让容器组件拿到state。
+import { Provider } from 'react-redux'
+import { createStore } from 'redux'
+import todoApp from './reducers'
+import App from './components/App'
+let store = createStore(todoApp);
+render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById('root')
+)
+上面代码中，Provider在根组件外面包了一层，这样一来，App的所有子组件就默认都可以拿到state了。
+它的原理是React组件的context属性，请看源码。
+class Provider extends Component {
+  getChildContext() {
+    return {
+      store: this.props.store
+    };
+  }
+  render() {
+    return this.props.children;
+  }
+}
+Provider.childContextTypes = {
+  store: React.PropTypes.object
+}
+上面代码中，store放在了上下文对象context上面。然后，子组件就可以从context拿到store，代码大致如下。
+class VisibleTodoList extends Component {
+  componentDidMount() {
+    const { store } = this.context;
+    this.unsubscribe = store.subscribe(() =>
+      this.forceUpdate()
+    );
+  }
+  render() {
+    const props = this.props;
+    const { store } = this.context;
+    const state = store.getState();
+    // ...
+  }
+}
+VisibleTodoList.contextTypes = {
+  store: React.PropTypes.object
+}
+React-Redux自动生成的容器组件的代码，就类似上面这样，从而拿到store。
+
+表单
+
+表单不同于其他 HTML 元素，因为它要响应用户的交互，显示不同的状态，所以在 React 里面会有点特殊。
+状态属性
+表单元素有这么几种属于状态的属性：
+value，对应 <input> 和 <textarea> 所有
+checked，对应类型为 checkbox 和 radio 的 <input> 所有
+selected，对应 <option> 所有
+在 HTML 中 <textarea> 的值可以由子节点（文本）赋值，但是在 React 中，要用 value 来设置。
+表单元素包含以上任意一种状态属性都支持 onChange 事件监听状态值的更改。
+针对这些状态属性不同的处理策略，表单元素在 React 里面有两种表现形式。
+
+受控组件
+对于设置了上面提到的对应“状态属性“值的表单元素就是受控表单组件，比如：
+render: function() {
+    return <input type="text" value="hello"/>;
+}
+一个受控的表单组件，它所有状态属性更改涉及 UI 的变更都由 React 来控制（状态属性绑定 UI）。比如上面代码里的 <input> 输入框，用户输入内容，用户输入的内容不会显示（输入框总是显示状态属性 value 的值 hello），这有点颠覆我们的认知了，所以说这是受控组件，不是原来默认的表单元素了。
+如果你希望输入的内容反馈到输入框，就要用 onChange 事件改变状态属性 value 的值。
+
+非受控组件
+和受控组件相对，如果表单元素没有设置自己的“状态属性”，或者属性值设置为 null，这时候就是非受控组件。
+它的表现就符合普通的表单元素，正常响应用户的操作。
+同样，你也可以绑定 onChange 事件处理交互。如果你想要给“状态属性”设置默认值，就要用 React 提供的特殊属性 defaultValue，对于 checked 会有 defaultChecked，<option> 也是使用 defaultValue。
+
+select
+在 HTML 中 <select> 标签指定选中项都是通过对应 <option> 的 selected 属性来做的，但是在 React 修改成统一使用 value。
+所以没有一个 selected 的状态属性。
+<select value="B">
+    <option value="A">Apple</option>
+    <option value="B">Banana</option>
+    <option value="C">Cranberry</option>
+</select>
+你可以通过传递一个数组指定多个选中项：<select multiple={true} value={['B', 'C']}>
+react-router 提供了一个 <Link> 组件用来替代 <a> 标签，它负责管理浏览器 history，从而不是每次点击链接都去请求服务器，然后可以通过绑定 onClick 事件来作其他处理。
+比如在 /list 页面，对于每一个 item 都会用 <Link> 绑定一个 route url：/item/:id，并且绑定 onClick 去触发 dispatch(fetchItem(id)) 获取数据，显示详情页内容。
+
+react-router
+react-router 通过一种声明式的方式匹配不同路由决定在页面上展示不同的组件，并且通过 props 将路由信息传递给组件使用，所以只要路由变更，props 就会变化，触发组件 re-render。
+假设有一个很简单的应用，只有两个页面，一个列表页 /list 和一个详情页 /item/:id，点击列表上的条目进入详情页。
+可以这样定义路由，./routes.js
+
+import React from 'react';
+import { Route } from 'react-router';
+import { List, Item } from './components';
+// 无状态（stateless）组件，一个简单的容器，react-router 会根据 route
+// 规则匹配到的组件作为 `props.children` 传入
+const Container = (props) => {
+  return (
+    <div>{props.children}</div>
+  );
+};
+// route 规则：
+// - `/list` 显示 `List` 组件
+// - `/item/:id` 显示 `Item` 组件
+const routes = (
+  <Route path="/" component={Container} >
+    <Route path="list" component={List} />
+    <Route path="item/:id" component={Item} />
+  </Route>
+);
+export default routes;
+
+Reducer
+Store 是由 reducer 产生的，所以 reducer 实际上反映了 Store 的状态树结构
+./reducers/index.js
+import listReducer from './list';
+import itemReducer from './item';
+export default function rootReducer(state = {}, action) {
+  return {
+    list: listReducer(state.list, action),
+    item: itemReducer(state.item, action)
+  };
+}
+rootReducer 的 state 参数就是整个 Store 的状态树，状态树下的每个字段对应也可以有自己的 reducer，所以这里引入了 listReducer 和 itemReducer，可以看到这两个 reducer 的 state 参数就只是整个状态树上对应的 list 和 item 字段。
+具体到 ./reducers/list.js
+const initialState = [];
+export default function listReducer(state = initialState, action) {
+  switch(action.type) {
+  case 'FETCH_LIST_SUCCESS': return [...action.payload];
+  default: return state;
+  }
+}
+list 就是一个包含 items 的简单数组，可能类似这种结构：[{ id: 0, name: 'first item'}, {id: 1, name: 'second item'}]，从 'FETCH_LIST_SUCCESS' 的 action.payload 获得。
+然后是 ./reducers/item.js，处理获取到的 item 数据
+const initialState = {};
+export default function listReducer(state = initialState, action) {
+  switch(action.type) {
+  case 'FETCH_ITEM_SUCCESS': return [...action.payload];
+  default: return state;
+  }
+}
+
+Action
+对应的应该要有两个 action 来获取 list 和 item，触发 reducer 更改 Store，这里我们定义 fetchList 和 fetchItem 两个 action。
+./actions/index.js
+import fetch from 'isomorphic-fetch';
+export function fetchList() {
+  return (dispatch) => {
+    return fetch('/api/list')
+        .then(res => res.json())
+        .then(json => dispatch({ type: 'FETCH_LIST_SUCCESS', payload: json }));
+  }
+}
+export function fetchItem(id) {
+  return (dispatch) => {
+    if (!id) return Promise.resolve();
+    return fetch(`/api/item/${id}`)
+        .then(res => res.json())
+        .then(json => dispatch({ type: 'FETCH_ITEM_SUCCESS', payload: json }));
+  }
+}
+isomorphic-fetch 是一个前后端通用的 Ajax 实现，前后端要共享代码这点很重要。
+另外因为涉及到异步请求，这里的 action 用到了 thunk，也就是函数，redux 通过 thunk-middleware 来处理这类 action，把函数当作普通的 action dispatch 就好了，比如 dispatch(fetchList())
+Store
+我们用一个独立的 ./store.js，配置（比如 Apply Middleware）生成 Store
+import { createStore } from 'redux';
+import rootReducer from './reducers';
+// Apply middleware here
+// ...
+export default function configureStore(initialState) {
+  const store = createStore(rootReducer, initialState);
+  return store;
+}
+
+react-redux
+接下来就是实现 <List>，<Item> 组件，然后把 Redux 和 React 组件关联起来，具体细节参见 react-redux
+./app.js
+import React from 'react';
+import { render } from 'react-dom';
+import { Router } from 'react-router';
+import createBrowserHistory from 'history/lib/createBrowserHistory';
+import { Provider } from 'react-redux';
+import routes from './routes';
+import configureStore from './store';
+// `__INITIAL_STATE__` 来自服务器端渲染，下一部分细说
+const initialState = window.__INITIAL_STATE__;
+const store = configureStore(initialState);
+const Root = (props) => {
+  return (
+    <div>
+      <Provider store={store}>
+        <Router history={createBrowserHistory()}>
+          {routes}
+        </Router>
+      </Provider>
+    </div>
+  );
+}
+render(<Root />, document.getElementById('root'));
+至此，客户端部分结束。

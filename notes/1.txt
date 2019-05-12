@@ -1,0 +1,127 @@
+延展属性
+https://www.cnblogs.com/soaringEveryday/p/6078371.html
+Spread语法是ES6中的一个新特性，在需要使用多参数（函数参数）、多元素（数组迭代）或者多变量（解构赋值）的地方使用spread语法，可以让表达式的结果平铺化
+当做参数传递
+function myFunction(x, y, z) { }
+var args = [0, 1, 2];
+myFunction(...args);
+这里就和java的可变参数有点类似，...（spread操作符？spread语法）用来将args数组展开，分别当做参数传递给了myFunction的x，y，z
+
+function myFunction(v, w, x, y, z) { }
+var args = [0, 1];
+myFunction(-1, ...args, 2, ...[3]);
+这个例子说明spread操作符可以多次使用。0和1分别当做参数赋值给了w和x，最后一个[3]也是一个数组，那么他被spread操作符展开后当然就只有一个结果，即3被赋值给了z
+
+spread要求转换可枚举类型
+var obj = {"key1":"value1"};
+var array = [...obj]; // TypeError: obj is not iterable
+以上的代码会报错，obj是一个对象，spread并不能将对象延展成数组
+var array = {...obj}; // 这个是可以的，对象能转成对象，{ key1: 'value1' }
+
+rest操作符
+rest操作符也是三个点（...），但实际他和spread操作符相反，他是将多个元素组合成一个元素，这里其实就是java的可变参数，但是在js中叫做rest参数
+
+在写React的代码的时候，spread attributes是最常用到的写法，用来传递一个对象给一个组件的props。想象一下如果Student属性特别多，那么难道要一个个的在这里写上吗？何况当这个Student可能并不似你写的，里面有哪些属性你也并不清楚。这里可以用到spread操作符：
+var args = {
+    name: "xiaoming",
+    age: 10
+}
+ReactDOM.render((
+    <Student {...args}/>
+), document.getElementById("main"));
+这段代码和上面的是等价的
+
+jsx
+https://blog.csdn.net/lihongxun945/article/details/45826851
+要注意的是，大括号实际就是一个变量输出表达式，JSX最终就是直接把花括号中的内容作为 React.createElement 的第三个参数直接传入了（没有任何修改直接传入），所以其中只能放一行表达式，并且任何不能直接作为第三个参数的写法都是错的，
+
+React.createElement(
+  type,
+  [props],
+  [...children]
+)
+第一个参数是必填，传入的是似HTML标签名称，eg: ul, li 
+第二个参数是选填，表示的是属性，eg: className 
+第三个参数是选填, 子节点，eg: 要显示的文本内容，可多个
+示例：
+var child1 = React.createElement('li', null, 'one');
+var child2 = React.createElement('li', null, 'two');
+var content = React.createElement('ul', { className: 'teststyle' }, child1, child2);
+
+var names = ['Alice', 'Emily', 'Kate'];
+React.render(
+<div>
+{
+names.map(function (name) {
+return <div>Hello, {name}!</div>
+})
+}
+</div>),
+document.getElementById('example')
+编译出来就变成了这样：
+var names = ['Alice', 'Emily', 'Kate']; 
+React.render( 
+  React.createElement("div", null, names.map(function (name) {
+    return React.createElement("div", null, `Hello, {name}!`) // 或 React.createElement("div", null, "Hello, ", name, "!");
+  }) ),
+ document.getElementById('example')
+);
+
+<Nav><Profile>click</Profile></Nav>
+编译为：
+React.createElement(Nav,
+  React.createElement(Profile, null, “click")
+);
+
+你也可以通过 JS 语法来写子节点：
+<Nav>{login ? <Profile>click</Profile> : <Login>login</Login>}</Nav>
+
+
+Webpack 
+http://caibaojian.com/react/webpack.html
+是一个前端资源加载/打包工具，只需要相对简单的配置就可以提供前端工程化需要的各种功能，并且如果有需要它还可以被整合到其他比如 Grunt / Gulp 的工作流。
+
+安装 Webpack：npm install -g webpack
+
+Webpack 使用一个名为 webpack.config.js 的配置文件，要编译 JSX，先安装对应的 loader: npm install babel-loader --save-dev
+
+假设我们在当前工程目录有一个入口文件 entry.js，React 组件放置在一个 components/ 目录下，组件被 entry.js 引用，要使用 entry.js，我们把这个文件指定输出到 dist/bundle.js，Webpack 配置如下：
+
+var path = require('path');
+
+module.exports = {
+    entry: './entry.js',
+    output: {
+        path: path.join(__dirname, '/dist'),
+        filename: 'bundle.js'
+    },
+    resolve: {
+        extensions: ['', '.js', '.jsx']
+    },
+    module: {
+        loaders: [
+            { test: /\.js|jsx$/, loaders: ['babel'] }
+        ]
+    }
+}
+resolve 指定可以被 import 的文件后缀。比如 Hello.jsx 这样的文件就可以直接用 import Hello from 'Hello' 引用。
+loaders 指定 babel-loader 编译后缀名为 .js 或者 .jsx 的文件，这样你就可以在这两种类型的文件中自由使用 JSX 和 ES6 了。
+监听编译: webpack -d --watch
+
+服务器端渲染
+SSR，英文全称叫 Server side rendering ，服务器端渲染。
+每当有客户端请求页面了，服务器先在后端调用（模板引擎）template，把指定的页面预先在后端渲染后，然后通过res.end把这个渲染完毕的完整页面，返回给客户端直接展示。
+优点：对SEO友好，因为我们经过服务器端渲染的页面，在网络中传输的时候，传输的是一个真实的页面。因此，爬虫客户端，当爬到我们的页面后，会分系我们给他提供的这个页面，此时，我们页面中的关键数据就会被爬虫给收录了。
+缺点： 服务器端渲染，对服务器压力比较打，可以使用服务器端的页面缓存技术，减轻服务器的渲染压力；不适合前后端分离开发。
+
+客户端渲染
+html 仅仅作为静态文件，客户端端在请求时，服务端不做任何处理，直接以原文件的形式返回给客户端客户端，然后根据 html 上的 JavaScript，生成 DOM 插入 html。针对客户端状态变化，请求了数据，进行局部dom变化（局部可能大到整个body）。
+优点： 减轻了服务器端的渲染压力;同时，最大的好处就是：能够实现前后端分离开发;
+缺点： 对SEO相当不友好
+
+单页面应用
+在SPA场景下 
+服务端渲染都是针对第一次get请求，用于生产完整的html给浏览器，浏览器直接出首屏。 
+客户端渲染都是针对客户端状态变化，请求了数据，进行局部dom变化（局部可能大到整个body）。
+--------------------- 
+https://blog.csdn.net/u014689760/article/details/80548301 
