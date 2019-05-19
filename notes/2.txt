@@ -1,4 +1,8 @@
 REACT
+1.jsx中的注释写法为{//或/**/}，发布版本这些注释会被删除
+2.jsx中lable用htmlFor代替for，标签的css样式用className代替class
+3.react组件用dangerouslySetInnerHTML属性可以以html的方式设置元素内容，但可能被xss攻击
+
 如果混用“合成事件”和“原生事件”，比如一种常见的场景是用原生事件在 document 
 上绑定，然后在组件里面绑定的合成事件想要通过 e.stopPropagation() 来阻止事件冒泡到 
 document，这时候是行不通的，参见 Event delegation，因为 e.stopPropagation 是内部“合成事件” 

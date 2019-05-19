@@ -124,4 +124,31 @@ html 仅仅作为静态文件，客户端端在请求时，服务端不做任何
 服务端渲染都是针对第一次get请求，用于生产完整的html给浏览器，浏览器直接出首屏。 
 客户端渲染都是针对客户端状态变化，请求了数据，进行局部dom变化（局部可能大到整个body）。
 --------------------- 
-https://blog.csdn.net/u014689760/article/details/80548301 
+https://blog.csdn.net/u014689760/article/details/80548301
+
+webpack 搭建react工程踩坑：
+1、babel必须要至少安装以下包，版本有限制
+    "babel": "^6.23.0",
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.5", // 注意不能是8，因为8的话不能装babel，而是替换成@babel/core要求
+    "babel-preset-env": "^1.7.0", // 用于转换ES6基础语法（可代替babel-preset-es2015），但是不能转换一些高级对象
+    "babel-preset-react": "^6.24.1", // 用于转换react
+2、react要安装如下包，版本不限
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6",
+    "redux": "^4.0.1", // 可选
+3、webpack.config.js配置时要注意匹配所有js、jsx而除去nodemodule的源文件，如果有css要打包要单独安装
+    rules:[
+        {
+          test:/\.jsx?$/,
+          exclude: /node_modules/,
+          use: [{
+              loader: "babel-loader",
+              options: { presets: ["env","react"] }
+          }],
+          {   //这里的内容是新增加的对样式的支持
+              test: /\.css$/,
+              use: ["style-loader", "css-loader"],
+          }
+        },
+    ]
