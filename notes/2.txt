@@ -30,7 +30,8 @@ handleClick: function(param, event) {
 
 class App extends Component {
   constructor() {
-    return { userInput: '' };
+    this.handleChange = this.handleChange.bind(this);
+    this.clearAndFocusInput = this.clearAndFocusInput.bind(this);
   }
 
   handleChange(e) {
@@ -46,13 +47,13 @@ class App extends Component {
   render() {
     return (
       <div>
-        <div onClick={this.clearAndFocusInput.bind(this)}>
+        <div onClick={this.clearAndFocusInput}>
           Click to Focus and Reset
         </div>
         <input
           ref="theInput"
           value={this.state.userInput}
-          onChange={this.handleChange.bind(this)}
+          onChange={this.handleChange}
         />
       </div>
     );
@@ -176,92 +177,9 @@ reducer 函数判断 action.type 然后处理对应的 action.payload 数据来�
 这就是 Redux 的运作流程，接下来看如何在 React 里面使用 Redux。
 http://caibaojian.com/react/usage-with-react.html
 
-Redux
-基本概念
-
-3.1 Store
-Store 就是保存数据的地方，你可以把它看成一个容器。整个应用只能有一个 Store。
-Redux 提供createStore这个函数，用来生成 Store。
-import { createStore } from 'redux';
-let { subscribe, dispatch, getState } = createStore(reducer);
-
-3.2 State
-Store对象包含所有数据。如果想得到某个时点的数据，就要对 Store 生成快照。这种时点的数据集合，就叫做 State。
-当前时刻的 State，可以通过store.getState()拿到。Redux 规定， 一个 State 对应一个 View。只要 State 相同，View 就相同。
-
-3.3 Action
-State 的变化，会导致 View 的变化。但是，用户接触不到 State，只能接触到 View。所以，State 的变化必须是 View 导致的。Action 就是 View 发出的通知，表示 State 应该要发生变化了。
-Action 是一个对象。其中的type属性是必须的，表示 Action 的名称。
-const action = {
-  type: 'ADD_TODO',
-  payload: 'Learn Redux'
-};
-
-3.4 Action Creator
-View 要发送多少种消息，就会有多少种 Action。如果都手写，会很麻烦。可以定义一个函数来生成 Action，这个函数就叫 Action Creator。
-const ADD_TODO = '添加 TODO';
-function addTodo(text) {
-  return {
-    type: ADD_TODO,
-    text
-  }
-}
-const action = addTodo('Learn Redux');
-
-3.5 store.dispatch()
-store.dispatch()是 View 发出 Action 的唯一方法。
-
-3.6 Reducer
-Store 收到 Action 以后，必须给出一个新的 State，这样 View 才会发生变化。这种 State 的计算过程就叫做 Reducer。
-Reducer 是一个函数，它接受 Action 和当前 State 作为参数，返回一个新的 State。
-const reducer = function (state = defaultState, action) {
-  // ...
-  return new_state;
-};
-整个应用的初始状态，可以作为 State 的默认值。
-
-我们可以把 Reducer 函数拆分。不同的函数负责处理不同属性，最终把它们合并成一个大的 Reducer 即可。
-const chatReducer = (state = defaultState, action = {}) => {
-  return {
-    chatLog: chatLog(state.chatLog, action),
-    statusMessage: statusMessage(state.statusMessage, action),
-    userName: userName(state.userName, action)
-  }
-};
-Redux 提供了一个 combineReducers 方法，用于 Reducer 的拆分。你只要定义各个子 Reducer 函数，然后用这个方法，将它们合成一个大的 Reducer。
-import { combineReducers } from 'redux';
-const chatReducer = combineReducers({
-  chatLog,
-  statusMessage,
-  userName
-})
-export default todoApp;
-上面的代码通过combineReducers方法将三个子 Reducer 合并成一个大的函数。
-这种写法有一个前提，就是 State 的属性名必须与子 Reducer 同名。如果不同名，就要采用key-value写法。
-
-实际应用中，Reducer 函数不用手动调用，store.dispatch方法会触发 Reducer 的自动执行。为此，Store 需要知道 Reducer 函数，做法就是在生成 Store 的时候，将 Reducer 传入createStore方法。
-import { createStore } from 'redux';
-const store = createStore(reducer);
-
-
-3.8 store.subscribe()
-Store 允许使用store.subscribe方法设置监听函数，一旦 State 发生变化，就自动执行这个函数。
-import { createStore } from 'redux';
-const store = createStore(reducer);
-store.subscribe(listener);
-显然，只要把 View 的更新函数（对于 React 项目，就是组件的render方法或setState方法）放入listen，就会实现 View 的自动渲染。
-
-store.subscribe方法返回一个函数，调用这个函数就可以解除监听。
-let unsubscribe = store.subscribe(() =>
-  console.log(store.getState())
-);
-unsubscribe();
-
-
 React-Redux
 为了方便使用，Redux 的作者封装了一个 React 专用的库 React-Redux，本文主要介绍它。
 这个库是可以选用的。实际项目中，你应该权衡一下，是直接使用 Redux，还是使用 React-Redux。React-Redux需要掌握新的api和组件拆分规范。
-
 
 一、UI 组件
 React-Redux 将所有组件分成两大类：UI 组件（presentational component）和容器组件（container component）。
@@ -285,7 +203,7 @@ const Title =
 React-Redux 规定，所有的 UI 组件都由用户提供，容器组件则是由 React-Redux 自动生成。也就是说，用户负责视觉层，状态管理则是全部交给它。
 
 三、connect()
-React-Redux 提供connect方法，用于从 UI 组件生成容器组件。connect的意思，就是将这两种组件连起来。
+React-Redux 提供connect方法，用于从 UI 组件生成容器组件。connect的意思，就是将这两种组件连起来，或者说将组件与redux的store连接起来。
 import { connect } from 'react-redux'
 const VisibleTodoList = connect()(TodoList);
 上面代码中，TodoList是 UI 组件，VisibleTodoList就是由 React-Redux 通过connect方法自动生成的容器组件。
@@ -298,7 +216,7 @@ const VisibleTodoList = connect(
   mapStateToProps,
   mapDispatchToProps
 )(TodoList)
-上面代码中，connect方法接受两个参数：mapStateToProps和mapDispatchToProps。它们定义了 UI 组件的业务逻辑。前者负责输入逻辑，即将state映射到 UI 组件的参数（props），后者负责输出逻辑，即将用户对 UI 组件的操作映射成 Action。
+上面代码中，connect方法接受两个参数：mapStateToProps和mapDispatchToProps。它们定义了 UI 组件的业务逻辑。前者负责输入逻辑，即将state映射到 UI 组件的参数（props），后者负责输出逻辑，即将用户对 UI 组件的操作映射成 Action：本质上也是将dispatch action的方法作为props属性传给UI组件。
 
 四、mapStateToProps()
 mapStateToProps是一个函数。它的作用就是像它的名字那样，建立一个从（外部的）state对象到（UI 组件的）props对象的映射关系。

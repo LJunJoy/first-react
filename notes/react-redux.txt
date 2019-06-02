@@ -1,0 +1,89 @@
+app.js
+	App = () => { return xxx; } // 无状态组件或UI组件
+	mapStateToProps(state){ return {属性名:属性值} } // 告诉UI组件的输入参数有哪些
+	mapDispatchToProps(dispatch){ return {函数名:函数体} } // 告诉UI组件产生的事件如何派发、输出
+	export default connect(mapStateToProps, mapDispatchToProps)(App); // 聪明组件或容器组件
+其中mapDispatchToProps支持返回函数或对象的形式：
+const mapDispatchToProps = (
+  dispatch,
+  ownProps // 可选的第2个参数，代表容器组件的props对象（注意不是UI组件的！）
+) => {
+  return {
+    onClick: () => {
+      dispatch({
+        type: 'SET_VISIBILITY_FILTER',
+        filter: ownProps.filter
+      }); // 这里的action一般调用actioncreater的函数得到，如果用到了redux-thunk中间件的话action还可以是一个函数
+    }
+  };
+}
+const mapDispatchToProps = {
+  onClick: (filter) => {
+    type: 'SET_VISIBILITY_FILTER',
+    filter: filter
+  };
+}
+
+
+actionCreaters.js
+	export function addTodo(text) {
+	  return {
+		type: 'ADD_TODO',
+		value: text
+	  }
+	},
+	export function getServerData(url) {
+	  return (dispatch) => { // 还有可选的第2个参数 ownProps，即容器组件的props对象
+		var data = axios.get(url).then(
+			dispatch({具体的action});
+		).error{
+			xxx
+		}
+	  }
+	}
+
+actionTypes.js
+	export const XXX="XXX";
+	export const YYY="YYY";
+
+// reducer.js
+	export default(state=初始状态, action) => {
+		switch(action.type){
+			case xxx:
+				const newState=({...state, 属性名: 新属性值})
+				return newState;
+			default:
+				return state;
+		}
+	}
+// Reducer 是 pure function，不要调用不纯的api，例如 Data.now() Math.random()
+// 可拆开成多个小的reducer：
+	function someReducer(state = {}, action) {
+	  return {
+		a: reducerA(state.a, action),
+		b: reducerB(state.b, action)
+	  };
+	}
+// Redux 提供了一个工具函数 combineReducers 来简化这种 reducer 合并：
+	import { combineReducers } from 'redux';
+	const someReducer = combineReducers({
+	  a: reducerA,
+	  b: reducerB
+	});
+	
+	
+index.js
+import { Provider } from 'react-redux'
+import { createStore } from 'redux'
+import someReducer from './reducers'
+import App from './components/App'
+
+//连接action和reducer：在create时传入reducer，告诉store怎么应对各个action
+let store = createStore(someReducer); // 可以在第2个形参处额外指定一个初始 State
+render(
+  <Provider store={store}>
+    <App />
+  </Provider>,
+  document.getElementById('root')
+)
+// 上面代码中，Provider在根组件外面包了一层，这样一来，App的所有子组件就默认都可以拿到state了。

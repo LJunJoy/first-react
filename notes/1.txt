@@ -10,7 +10,7 @@ myFunction(...args);
 function myFunction(v, w, x, y, z) { }
 var args = [0, 1];
 myFunction(-1, ...args, 2, ...[3]);
-这个例子说明spread操作符可以多次使用。0和1分别当做参数赋值给了w和x，最后一个[3]也是一个数组，那么他被spread操作符展开后当然就只有一个结果，即3被赋值给了z
+这个例子说明spread操作符可以多次使用。0和1分别当做参数赋值给了w和x，最后一个[3]也是一个数组，那么它被spread操作符展开后当然就只有一个结果，即3被赋值给了z
 
 spread要求转换可枚举类型
 var obj = {"key1":"value1"};
@@ -21,7 +21,7 @@ var array = {...obj}; // 这个是可以的，对象能转成对象，{ key1: 'v
 rest操作符
 rest操作符也是三个点（...），但实际他和spread操作符相反，他是将多个元素组合成一个元素，这里其实就是java的可变参数，但是在js中叫做rest参数
 
-在写React的代码的时候，spread attributes是最常用到的写法，用来传递一个对象给一个组件的props。想象一下如果Student属性特别多，那么难道要一个个的在这里写上吗？何况当这个Student可能并不似你写的，里面有哪些属性你也并不清楚。这里可以用到spread操作符：
+在写React的代码的时候，spread attributes是最常用到的写法，用来传递一个对象给一个组件的props。想象一下如果Student属性特别多，那么难道要一个个的在这里写上吗？何况当这个Student可能并不是你写的，里面有哪些属性你也并不清楚。这里可以用到spread操作符：
 var args = {
     name: "xiaoming",
     age: 10
@@ -133,10 +133,10 @@ webpack 搭建react工程踩坑：
     "babel-loader": "^7.1.5", // 注意不能是8，因为8的话不能装babel，而是替换成@babel/core要求
     "babel-preset-env": "^1.7.0", // 用于转换ES6基础语法（可代替babel-preset-es2015），但是不能转换一些高级对象
     "babel-preset-react": "^6.24.1", // 用于转换react
+    "babel-preset-stage-2": "^6.24.1", // 用于转换ES6的扩展运算符等语法
 2、react要安装如下包，版本不限
     "react": "^16.8.6",
-    "react-dom": "^16.8.6",
-    "redux": "^4.0.1", // 可选
+    "react-dom": "^16.8.6",    
 3、webpack.config.js配置时要注意匹配所有js、jsx而除去nodemodule的源文件，如果有css要打包要单独安装
     rules:[
         {
@@ -144,7 +144,7 @@ webpack 搭建react工程踩坑：
           exclude: /node_modules/,
           use: [{
               loader: "babel-loader",
-              options: { presets: ["env","react"] }
+              options: { presets: ["env","react","stage-2"] }
           }],
           {   //这里的内容是新增加的对样式的支持
               test: /\.css$/,
@@ -152,3 +152,12 @@ webpack 搭建react工程踩坑：
           }
         },
     ]
+4、redux要安装如下包，版本有限，如果react-redux版本是7会报错 connect is not a function connectAdvanced.js
+"redux": "^4.0.1",
+"react-redux": "^6.0.1"
+
+5、如果要热编译，安装webpack-dev-server，注意3.x的webpack建议用2.x的webpack-dev-server版本
+6、如果要生成source map方便调试，在启动参数中添加 --devtool source-map
+7、注意去掉index.html模板中的图标引用，避免dev-server报无关的错误信息
+  <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
+  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
