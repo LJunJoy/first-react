@@ -171,6 +171,76 @@ select
 </select>
 你可以通过传递一个数组指定多个选中项：<select multiple={true} value={['B', 'C']}>
 
+React 有三种创建组件的方式：
+一、函数组件，也即无状态组件，有以下几个显著的特点：
+1、组件不会被实例化，整体渲染性能得到提升
+因为组件被精简成一个render方法的函数来实现的，由于是无状态组件，所以无状态组件就不会在有组件实例化的过程，无实例化过程也就不需要分配多余的内存，从而性能得到一定的提升。
+2、组件不能访问this对象
+无状态组件由于没有实例化过程，所以无法访问组件this中的对象，例如：this.ref、this.state等均不能访问。若想访问就不能使用这种形式来创建组件
+3、组件无法访问生命周期的方法
+因为无状态组件是不需要组件生命周期管理和状态管理，所以底层实现这种形式的组件时是不会实现组件的生命周期方法。所以无状态组件是不能参与组件的各个生命周期管理的。
+4、无状态组件只能访问输入的props，同样的props会得到同样的渲染结果，不会有副作用
+无状态组件被鼓励在大型项目中尽可能以简单的写法来分割原本庞大的组件，未来React也会这种面向无状态组件在譬如无意义的检查和内存分配领域进行一系列优化，所以只要有可能，尽量使用无状态组件。
+
+二、React.createClass
+三、React.Component区别
+React.Component是用来取代React.createClass创建方式的。
+
+函数this自绑定
+React.createClass创建的组件，其每一个成员函数的this都有React自动绑定，任何时候使用，直接使用this.method即可，函数中的this会被正确设置。
+const Contacts = React.createClass({  
+  handleClick() {
+    console.log(this); // React Component instance
+  },
+  propTypes: { // as an object
+    name: React.PropTypes.string
+  },
+  getDefaultProps(){   // return a object
+	return {
+		name: ''    
+	}
+  },
+  render() {
+    return (
+      <div onClick={this.handleClick}></div>
+    );
+  }
+});
+React.Component创建的组件，其成员函数不会自动绑定this，需要开发者手动绑定，否则this不能获取当前组件实例对象。
+
+class Contacts extends React.Component {  
+  constructor(props) {
+    super(props);
+  }
+  static propTypes = {//类的静态属性
+	name: React.PropTypes.string
+  };
+  static defaultProps = {//类的静态属性
+	name: ''
+  };
+  
+  handleClick() {
+    console.log(this); // null
+  }
+  render() {
+    return (
+      <div onClick={this.handleClick}></div>
+    );
+  }
+}
+当然，React.Component有三种手动绑定方法：可以在构造函数中完成绑定，也可以在调用时使用method.bind(this)来完成绑定，还可以使用arrow function来绑定。
+
+组件属性类型propTypes及其默认props属性defaultProps配置不同
+React.createClass在创建组件时，有关组件props的属性类型及组件默认的属性会作为组件实例的属性来配置，其中defaultProps是使用getDefaultProps的方法来获取默认组件属性的
+React.Component在创建组件时配置这两个对应信息时，他们是作为组件类的属性，不是组件实例的属性，也就是所谓的类的静态属性来配置的。
+
+组件初始状态state的配置不同
+React.createClass创建的组件，其状态state是通过getInitialState方法来配置组件相关的状态；
+React.Component创建的组件，其状态state是在constructor中像初始化组件属性一样声明的。
+
+Mixins的支持不同
+Mixins(混入)是面向对象编程OOP的一种实现，其作用是为了复用共有的代码，将共有的代码通过抽取为一个对象，然后通过Mixins进该对象来达到代码复用。React.createClass在创建组件时可以使用mixins属性，以数组的形式来混合类的集合。至今React团队还没有给出一个该形式下的官方解决方案；但是React开发者社区提供一个全新的方式来取代Mixins,那就是Higher-Order Components 高阶组件。
+
 https://www.jianshu.com/p/63569386befc
 无状态组件(Stateless Component) 是 React 0.14 之后推出的，大大增强了编写 React 组件的方便性，也提升了整体的渲染性能。
 无状态组件 (Stateless Component)
@@ -264,14 +334,14 @@ ref 和 findDOMNode 这个组合，实际上是打破了父子组件之间仅仅
 无状态组件尚不支持 babel-plugin-react-transform 的 Hot Module Replacement
 如果你是用 Webpack 以及 HMR，用 babel-plugin-react-transform 来做 jsx 转换等，那么当你在编辑器中修改无状态组件的源代码的时候，HMR 并不会在浏览器中自动载入修改后的代码。具体问题跟踪请参 https://github.com/gaearon/babel-plugin-react-transform/issues/57 。
 
-
-无状态组件还有以下几个显著的特点：
-
-1、组件不会被实例化，整体渲染性能得到提升
-因为组件被精简成一个render方法的函数来实现的，由于是无状态组件，所以无状态组件就不会在有组件实例化的过程，无实例化过程也就不需要分配多余的内存，从而性能得到一定的提升。
-2、组件不能访问this对象
-无状态组件由于没有实例化过程，所以无法访问组件this中的对象，例如：this.ref、this.state等均不能访问。若想访问就不能使用这种形式来创建组件
-3、组件无法访问生命周期的方法
-因为无状态组件是不需要组件生命周期管理和状态管理，所以底层实现这种形式的组件时是不会实现组件的生命周期方法。所以无状态组件是不能参与组件的各个生命周期管理的。
-4、无状态组件只能访问输入的props，同样的props会得到同样的渲染结果，不会有副作用
-无状态组件被鼓励在大型项目中尽可能以简单的写法来分割原本庞大的组件，未来React也会这种面向无状态组件在譬如无意义的检查和内存分配领域进行一系列优化，所以只要有可能，尽量使用无状态组件。
+补充一点
+无状态组件内部虽然不能通过this.refs访问到，但是可以通过将ref内容保存到无状态组件内部的一个本地变量中获取到。
+例如下面这段代码可以使用ref来获取组件挂载到dom中后所指向的dom元素：
+function TestComp(props){
+    let ref;
+    return (<div>
+        <div ref={(node) => ref = node}>
+            ...
+        </div>
+    </div>)
+}
