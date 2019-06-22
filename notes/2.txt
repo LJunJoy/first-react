@@ -35,14 +35,19 @@ class App extends Component {
   }
 
   handleChange(e) {
-    this.setState({ userInput: e.target.value });
+    this.setState({ userInput: e.target.value }); // setState调用方式一：设置一个对象
   }
 
   clearAndFocusInput() {
     this.setState({ userInput: '' }, () => {
-      this.refs.theInput.focus();
+      this.refs.theInput.focus(); // setState调用方式二：设置一个对象，并且设置成功后的回调函数，异步串行化还可以用async / await
     });
   }
+// setState调用方式三：设置一个函数
+  this.setState((prevState) => {
+    return {count: prevState.count + 1}
+  });
+// setState调用方式四：设置一个函数，同样可设置成功后的回调函数
 
   render() {
     return (
@@ -66,268 +71,70 @@ class App extends Component {
 阻止组件渲染
 在极少数情况下，你可能希望隐藏组件，即使它被其他组件渲染。让 render 方法返回 null 而不是它的渲染结果即可实现。
 
-redux
+https://segmentfault.com/a/1190000015463599
+我们先回顾一下现在对setState的认知：
+1.setState不会立刻改变React组件中state的值. 
+2.setState通过触发一次组件的更新来引发重绘. 
+3.多次setState函数调用产生的效果会合并。
 
-三个基本原则
-整个应用只有唯一一个可信数据源，也就是只有一个 Store
-State 只能通过触发 Action 来更改
-State 的更改必须写成纯函数，也就是每次更改总是返回一个新的 State，在 Redux 里这种函数称为 Reducer
+重绘指的就是引起React的更新生命周期函数4个函数：
 
-Actions
-Action 很简单，就是一个单纯的包含 { type, payload } 的对象，type 是一个常量用来标示动作类型，payload 是这个动作携带的数据。Action 需要通过 store.dispatch() 方法来发送。
-比如一个最简单的 action：
-{
-  type: 'ADD_TODO',
-  text: 'Build my first Redux app'
-}
-一般来说，会使用函数（Action Creators）来生成 action，这样会有更大的灵活性，Action Creators 是一个 pure function，它最后会返回一个 action 对象：
-function addTodo(text) {
-  return {
-    type: 'ADD_TODO',
-    text
-  }
-}
-要触发一个动作只要调用 dispatch(addTodo(text))
-稍后会讲到如何拿到 store.dispatch
+shouldComponentUpdate（被调用时this.state没有更新；如果返回了false，生命周期被中断，虽然不调用之后的函数了，但是state仍然会被更新）
+componentWillUpdate（被调用时this.state没有更新）
+render（被调用时this.state得到更新）
+componentDidUpdate
+如果每一次setState调用都走一圈生命周期，光是想一想也会觉得会带来性能的问题，其实这四个函数都是纯函数，性能应该还好，但是render函数返回的结果会拿去做Virtual DOM比较和更新DOM树，这个就比较费时间。
 
+目前React会将setState的效果放在队列中，积攒着一次引发更新过程。
+为的就是把Virtual DOM和DOM树操作降到最小，用于提高性能。
 
-Reducers
-Reducer 用来处理 Action 触发的对状态树的更改。
-所以一个 reducer 函数会接受 oldState 和 action 两个参数，返回一个新的 state：(oldState, action) => newState。一个简单的 reducer 可能类似这样：
-const initialState = {
-  a: 'a',
-  b: 'b'
+查阅一些资料后发现，某些操作还是可以同步更新this.state的。
+
+setState 什么时候会执行同步更新？
+先直接说结论吧：
+在React中，如果是由React引发的事件处理（比如通过onClick引发的事件处理），调用setState不会同步更新this.state，除此之外的setState调用会同步执行this.state。
+
+所谓“除此之外”，指的是绕过React通过
+addEventListener
+直接添加的事件处理函数，还有通过
+setTimeout || setInterval
+
+产生的异步调用。
+
+简单一点说， 就是经过React 处理的事件是不会同步更新this.state的. 通过 addEventListener || setTimeout/setInterval 的方式处理的则会同步更新。
+具体可以参考 jsBin 的这个例子。
+
+class Example extends React.Component {
+	constructor() {
+		super();
+		this.state = {
+			val: 0
+		};
+	}
+	componentDidMount() {
+		this.setState({val: this.state.val + 1});
+		console.log('第 1 次 log:', this.state.val);
+		this.setState({val: this.state.val + 1});
+		console.log('第 2 次 log:', this.state.val);
+
+		setTimeout(() => {
+			this.setState({val: this.state.val + 1});
+			console.log('第 3 次 log:', this.state.val); 
+			this.setState({val: this.state.val + 1});
+			console.log('第 4 次 log:', this.state.val); 
+		}, 0);
+	}
+	render() {
+		return null;
+	}
 };
-function someApp(state = initialState, action) {
-  switch (action.type) {
-    case 'CHANGE_A':
-      return { ...state, a: 'Modified a' };
-    case 'CHANGE_B':
-      return { ...state, b: action.payload };
-    default:
-      return state
-  }
-}
-值得注意的有两点：
-我们用到了 object spread 语法 确保不会更改到 oldState 而是返回一个 newState
-对于不需要处理的 action，直接返回 oldState
 
-Reducer 也是 pure function，这点非常重要，所以绝对不要在 reducer 里面做一些引入 side-effects 的事情，比如：
-直接修改 state 参数对象
-请求 API
-调用不纯的函数，比如 Data.now() Math.random()
-因为 Redux 里面只有一个 Store，对应一个 State 状态，所以整个 State 对象就是由一个 reducer 函数管理，但是如果所有的状态更改逻辑都放在这一个 reducer 里面，显然会变得越来越巨大，越来越难以维护。得益于纯函数的实现，我们只需要稍微变通一下，让状态树上的每个字段都有一个 reducer 函数来管理就可以拆分成很小的 reducer 了：
-function someApp(state = {}, action) {
-  return {
-    a: reducerA(state.a, action),
-    b: reducerB(state.b, action)
-  };
-}
-对于 reducerA 和 reducerB 来说，他们依然是形如：(oldState, action) => newState 的函数，只是这时候的 state 不是整个状态树，而是树上的特定字段，每个 reducer 只需要判断 action，管理自己关心的状态字段数据就好了。
+前两次在isBatchingUpdates 中，没有更新state, 输出两个0。
+后面两次会同步更新， 分别输出2， 3；
 
-Redux 提供了一个工具函数 combineReducers 来简化这种 reducer 合并：
-import { combineReducers } from 'redux';
-const someApp = combineReducers({
-  a: reducerA,
-  b: reducerB
-});
-如果 reducer 函数名字和字段名字相同，利用 ES6 的 Destructuring 可以进一步简化成：combineReducers({ a, b })
-象 someApp 这种管理整个 State 的 reducer，可以称为 root reducer。
-
-
-Store
-现在有了 Action 和 Reducer，Store 的作用就是连接这两者，Store 的作用有这么几个：
-Hold 住整个应用的 State 状态树
-提供一个 getState() 方法获取 State
-提供一个 dispatch() 方法发送 action 更改 State
-提供一个 subscribe() 方法注册回调函数监听 State 的更改
-
-创建一个 Store 很容易，将 root reducer 函数传递给 createStore 方法即可：
-
-import { createStore } from 'redux';
-import someApp from './reducers';
-let store = createStore(someApp);
-// 你也可以额外指定一个初始 State（initialState），这对于服务端渲染很有用
-// let store = createStore(someApp, window.STATE_FROM_SERVER);
-
-现在我们就拿到了 store.dispatch，可以用来分发 action 了：
-let unsubscribe = store.subscribe(() => console.log(store.getState()));
-// Dispatch
-store.dispatch({ type: 'CHANGE_A' });
-store.dispatch({ type: 'CHANGE_B', payload: 'Modified b' });
-// Stop listening to state updates
-unsubscribe();
-
-Data Flow
-以上提到的 store.dispatch(action) -> reducer(state, action) -> store.getState() 其实就构成了一个“单向数据流”，我们再来总结一下。
-1. 调用 store.dispatch(action)
-Action 是一个包含 { type, payload } 的对象，它描述了“发生了什么”，比如：
-{ type: 'LIKE_ARTICLE', articleID: 42 }
-{ type: 'FETCH_USER_SUCCESS', response: { id: 3, name: 'Mary' } }
-{ type: 'ADD_TODO', text: 'Read the Redux docs.' }
-你可以在任何地方调用 store.dispatch(action)，比如组件内部，Ajax 回调函数里面等等。
-
-2. Action 会触发给 Store 指定的 root reducer
-root reducer 会返回一个完整的状态树，State 对象上的各个字段值可以由各自的 reducer 函数处理并返回新的值。
-reducer 函数接受 (state, action) 两个参数
-reducer 函数判断 action.type 然后处理对应的 action.payload 数据来更新并返回一个新的 state
-
-3. Store 会保存 root reducer 返回的状态树
-新的 State 会替代旧的 State，然后所有 store.subscribe(listener) 注册的回调函数会被调用，在回调函数里面可以通过 store.getState() 拿到新的 State。
-这就是 Redux 的运作流程，接下来看如何在 React 里面使用 Redux。
-http://caibaojian.com/react/usage-with-react.html
-
-React-Redux
-为了方便使用，Redux 的作者封装了一个 React 专用的库 React-Redux，本文主要介绍它。
-这个库是可以选用的。实际项目中，你应该权衡一下，是直接使用 Redux，还是使用 React-Redux。React-Redux需要掌握新的api和组件拆分规范。
-
-一、UI 组件
-React-Redux 将所有组件分成两大类：UI 组件（presentational component）和容器组件（container component）。
-UI 组件有以下几个特征。
-只负责 UI 的呈现，不带有任何业务逻辑
-没有状态（即不使用this.state这个变量）
-所有数据都由参数（this.props）提供
-不使用任何 Redux 的 API
-下面就是一个 UI 组件的例子。
-const Title =
-  value => <h1>{value}</h1>;
-因为不含有状态，UI 组件又称为"纯组件"，即它纯函数一样，纯粹由参数决定它的值。
-
-二、容器组件
-容器组件的特征恰恰相反。
-负责管理数据和业务逻辑，不负责 UI 的呈现
-带有内部状态
-使用 Redux 的 API
-总之，只要记住一句话就可以了：UI 组件负责 UI 的呈现，容器组件负责管理数据和逻辑。
-你可能会问，如果一个组件既有 UI 又有业务逻辑，那怎么办？回答是，将它拆分成下面的结构：外面是一个容器组件，里面包了一个UI 组件。前者负责与外部的通信，将数据传给后者，由后者渲染出视图。
-React-Redux 规定，所有的 UI 组件都由用户提供，容器组件则是由 React-Redux 自动生成。也就是说，用户负责视觉层，状态管理则是全部交给它。
-
-三、connect()
-React-Redux 提供connect方法，用于从 UI 组件生成容器组件。connect的意思，就是将这两种组件连起来，或者说将组件与redux的store连接起来。
-import { connect } from 'react-redux'
-const VisibleTodoList = connect()(TodoList);
-上面代码中，TodoList是 UI 组件，VisibleTodoList就是由 React-Redux 通过connect方法自动生成的容器组件。
-但是，因为没有定义业务逻辑，上面这个容器组件毫无意义，只是 UI 组件的一个单纯的包装层。为了定义业务逻辑，需要给出下面两方面的信息。
-（1）输入逻辑：外部的数据（即state对象）如何转换为 UI 组件的参数
-（2）输出逻辑：用户发出的动作如何变为 Action 对象，从 UI 组件传出去。
-因此，connect方法的完整 API 如下。
-import { connect } from 'react-redux'
-const VisibleTodoList = connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(TodoList)
-上面代码中，connect方法接受两个参数：mapStateToProps和mapDispatchToProps。它们定义了 UI 组件的业务逻辑。前者负责输入逻辑，即将state映射到 UI 组件的参数（props），后者负责输出逻辑，即将用户对 UI 组件的操作映射成 Action：本质上也是将dispatch action的方法作为props属性传给UI组件。
-
-四、mapStateToProps()
-mapStateToProps是一个函数。它的作用就是像它的名字那样，建立一个从（外部的）state对象到（UI 组件的）props对象的映射关系。
-作为函数，mapStateToProps执行后应该返回一个对象，里面的每一个键值对就是一个映射。请看下面的例子。
-const mapStateToProps = (state) => {
-  return {
-    todos: getVisibleTodos(state.todos, state.visibilityFilter)
-  }
-}
-上面代码中，mapStateToProps是一个函数，它接受state作为参数，返回一个对象。这个对象有一个todos属性，代表 UI 组件的同名参数，后面的getVisibleTodos也是一个函数，可以从state算出 todos 的值。
-下面就是getVisibleTodos的一个例子，用来算出todos。
-const getVisibleTodos = (todos, filter) => {
-  switch (filter) {
-    case 'SHOW_ALL':
-      return todos
-    case 'SHOW_COMPLETED':
-      return todos.filter(t => t.completed)
-    case 'SHOW_ACTIVE':
-      return todos.filter(t => !t.completed)
-    default:
-      throw new Error('Unknown filter: ' + filter)
-  }
-}
-mapStateToProps会订阅 Store，每当state更新的时候，就会自动执行，重新计算 UI 组件的参数，从而触发 UI 组件的重新渲染。
-mapStateToProps的第一个参数总是state对象，还可以使用第二个参数，代表容器组件的props对象。
-// 容器组件的代码
-//    <FilterLink filter="SHOW_ALL">
-//      All
-//    </FilterLink>
-const mapStateToProps = (state, ownProps) => {
-  return {
-    active: ownProps.filter === state.visibilityFilter
-  }
-}
-使用ownProps作为参数后，如果容器组件的参数发生变化，也会引发 UI 组件重新渲染。
-connect方法可以省略mapStateToProps参数，那样的话，UI 组件就不会订阅Store，就是说 Store 的更新不会引起 UI 组件的更新。
-
-五、mapDispatchToProps()
-mapDispatchToProps是connect函数的第二个参数，用来建立 UI 组件的参数到store.dispatch方法的映射。也就是说，它定义了哪些用户的操作应该当作 Action，传给 Store。它可以是一个函数，也可以是一个对象。
-如果mapDispatchToProps是一个函数，会得到dispatch和ownProps（容器组件的props对象）两个参数。
-const mapDispatchToProps = (
-  dispatch,
-  ownProps
-) => {
-  return {
-    onClick: () => {
-      dispatch({
-        type: 'SET_VISIBILITY_FILTER',
-        filter: ownProps.filter
-      });
-    }
-  };
-}
-从上面代码可以看到，mapDispatchToProps作为函数，应该返回一个对象，该对象的每个键值对都是一个映射，定义了 UI 组件的参数怎样发出 Action。
-如果mapDispatchToProps是一个对象，它的每个键名也是对应 UI 组件的同名参数，键值应该是一个函数，会被当作 Action creator ，返回的 Action 会由 Redux 自动发出。举例来说，上面的mapDispatchToProps写成对象就是下面这样。
-const mapDispatchToProps = {
-  onClick: (filter) => {
-    type: 'SET_VISIBILITY_FILTER',
-    filter: filter
-  };
-}
-
-六、<Provider> 组件
-connect方法生成容器组件以后，需要让容器组件拿到state对象，才能生成 UI 组件的参数。
-一种解决方法是将state对象作为参数，传入容器组件。但是，这样做比较麻烦，尤其是容器组件可能在很深的层级，一级级将state传下去就很麻烦。
-React-Redux 提供Provider组件，可以让容器组件拿到state。
-import { Provider } from 'react-redux'
-import { createStore } from 'redux'
-import todoApp from './reducers'
-import App from './components/App'
-let store = createStore(todoApp);
-render(
-  <Provider store={store}>
-    <App />
-  </Provider>,
-  document.getElementById('root')
-)
-上面代码中，Provider在根组件外面包了一层，这样一来，App的所有子组件就默认都可以拿到state了。
-它的原理是React组件的context属性，请看源码。
-class Provider extends Component {
-  getChildContext() {
-    return {
-      store: this.props.store
-    };
-  }
-  render() {
-    return this.props.children;
-  }
-}
-Provider.childContextTypes = {
-  store: React.PropTypes.object
-}
-上面代码中，store放在了上下文对象context上面。然后，子组件就可以从context拿到store，代码大致如下。
-class VisibleTodoList extends Component {
-  componentDidMount() {
-    const { store } = this.context;
-    this.unsubscribe = store.subscribe(() =>
-      this.forceUpdate()
-    );
-  }
-  render() {
-    const props = this.props;
-    const { store } = this.context;
-    const state = store.getState();
-    // ...
-  }
-}
-VisibleTodoList.contextTypes = {
-  store: React.PropTypes.object
-}
-React-Redux自动生成的容器组件的代码，就类似上面这样，从而拿到store。
+很显然，我们可以将4次setState简单规成两类：
+componentDidMount是一类
+setTimeOut中的又是一类，因为这两次在不同的调用栈中执行。
 
 表单
 
@@ -363,120 +170,108 @@ select
     <option value="C">Cranberry</option>
 </select>
 你可以通过传递一个数组指定多个选中项：<select multiple={true} value={['B', 'C']}>
-react-router 提供了一个 <Link> 组件用来替代 <a> 标签，它负责管理浏览器 history，从而不是每次点击链接都去请求服务器，然后可以通过绑定 onClick 事件来作其他处理。
-比如在 /list 页面，对于每一个 item 都会用 <Link> 绑定一个 route url：/item/:id，并且绑定 onClick 去触发 dispatch(fetchItem(id)) 获取数据，显示详情页内容。
 
-react-router
-react-router 通过一种声明式的方式匹配不同路由决定在页面上展示不同的组件，并且通过 props 将路由信息传递给组件使用，所以只要路由变更，props 就会变化，触发组件 re-render。
-假设有一个很简单的应用，只有两个页面，一个列表页 /list 和一个详情页 /item/:id，点击列表上的条目进入详情页。
-可以这样定义路由，./routes.js
+https://www.jianshu.com/p/63569386befc
+无状态组件(Stateless Component) 是 React 0.14 之后推出的，大大增强了编写 React 组件的方便性，也提升了整体的渲染性能。
+无状态组件 (Stateless Component)
+function HelloComponent(props, /* context */) {
+  return <div>Hello {props.name}</div>
+}
+ReactDOM.render(<HelloComponent name="Sebastian" />, mountNode)
 
-import React from 'react';
-import { Route } from 'react-router';
-import { List, Item } from './components';
-// 无状态（stateless）组件，一个简单的容器，react-router 会根据 route
-// 规则匹配到的组件作为 `props.children` 传入
-const Container = (props) => {
+HelloComponent 第一个参数是 props，第二个是 context。最后一句也可以这么写：
+ReactDOM.render(HelloComponent{ name："Sebastian" }, mountNode)
+
+可以看到，原本需要写“类”定义（React.createClass 或者 class YourComponent extends React.Component）来创建自己组件的定义，现在被精简成了只写一个 render 函数。更值得一提的是，由于仅仅是一个无状态函数，React 在渲染的时候也省掉了将“组件类” 实例化的过程。
+结合 ES6 的解构赋值，可以让代码更精简。例如下面这个 Input 组件：
+function Input({ label, name, value, ...props }, { defaultTheme }) {
+  const { theme, autoFocus, ...rootProps } = props
   return (
-    <div>{props.children}</div>
-  );
-};
-// route 规则：
-// - `/list` 显示 `List` 组件
-// - `/item/:id` 显示 `Item` 组件
-const routes = (
-  <Route path="/" component={Container} >
-    <Route path="list" component={List} />
-    <Route path="item/:id" component={Item} />
-  </Route>
-);
-export default routes;
+    <label
+      htmlFor={name}
+      children={label || defaultLabel}
+      {...rootProps}
+    >
+    <input
+      name={name}
+      type="text"
+      value={value || ''}
+      theme={theme || defaultTheme}
+      {...props}
+    />
+  )}
+Input.contextTypes = {defaultTheme: React.PropTypes.object};
 
-Reducer
-Store 是由 reducer 产生的，所以 reducer 实际上反映了 Store 的状态树结构
-./reducers/index.js
-import listReducer from './list';
-import itemReducer from './item';
-export default function rootReducer(state = {}, action) {
-  return {
-    list: listReducer(state.list, action),
-    item: itemReducer(state.item, action)
-  };
-}
-rootReducer 的 state 参数就是整个 Store 的状态树，状态树下的每个字段对应也可以有自己的 reducer，所以这里引入了 listReducer 和 itemReducer，可以看到这两个 reducer 的 state 参数就只是整个状态树上对应的 list 和 item 字段。
-具体到 ./reducers/list.js
-const initialState = [];
-export default function listReducer(state = initialState, action) {
-  switch(action.type) {
-  case 'FETCH_LIST_SUCCESS': return [...action.payload];
-  default: return state;
-  }
-}
-list 就是一个包含 items 的简单数组，可能类似这种结构：[{ id: 0, name: 'first item'}, {id: 1, name: 'second item'}]，从 'FETCH_LIST_SUCCESS' 的 action.payload 获得。
-然后是 ./reducers/item.js，处理获取到的 item 数据
-const initialState = {};
-export default function listReducer(state = initialState, action) {
-  switch(action.type) {
-  case 'FETCH_ITEM_SUCCESS': return [...action.payload];
-  default: return state;
-  }
-}
+这个 Input 组件（仅仅是示例）直接实现了 label/inputText 的组合：
+defaultTheme 是从 Context 中解构出来的，如果 props 没有设定 theme，就将用 defaultTheme 替代。
+autoFocus 需要被传递到底层的 inputText 而不能同时遗留给 label，因此会先通过 { theme, autoFocus, ...rootProps } = props 拿出来。
 
-Action
-对应的应该要有两个 action 来获取 list 和 item，触发 reducer 更改 Store，这里我们定义 fetchList 和 fetchItem 两个 action。
-./actions/index.js
-import fetch from 'isomorphic-fetch';
-export function fetchList() {
-  return (dispatch) => {
-    return fetch('/api/list')
-        .then(res => res.json())
-        .then(json => dispatch({ type: 'FETCH_LIST_SUCCESS', payload: json }));
+无状态组件用来实现 Server 端渲染也很方便，只要避免去直接访问各种 DOM 方法。
+无状态组件与组件的生命周期方法
+我们可以看到，无状态组件就剩了一个 render 方法，因此也就没有没法实现组件的生命周期方法，例如 componentDidMount, componentWillUnmount 等。那么如果需要让我们的 Input 组件能够响应窗口大小的变化，那么该如何实现呢？这其实还是要引入“有状态的组件”，只不过这个“有状态的组件”可以不仅仅为 "Input" 组件服务。
+const ExecutionEnvironment = require('react/lib/ExecutionEnvironment')
+const defaultViewport = { width: 1366, height: 768 }; // Default size for server-side rendering
+
+function withViewport(ComposedComponent) {
+  return class Viewport extends React.Component {
+    state = {
+      // Server 端渲染和单元测试的时候可未必有 DOM 存在
+      viewport: ExecutionEnvironment.canUseDOM ? 
+        { width: window.innerWidth, height: window.innerHeight } : defaultViewport
+    }
+    componentDidMount() {
+      // Server 端渲染是不会执行到 `componentDidMount` 的，只会执行到 `componentWillMount`
+      window.addEventListener('resize', this.handleWindowResize)
+      window.addEventListener('orientationchange', this.handleWindowResize)
+    }
+    componentWillUnmount() {
+      window.removeEventListener('resize', this.handleWindowResize)
+      window.removeEventListener('orientationchange', this.handleWindowResize)
+    }
+    render() {
+      return <ComposedComponent {...this.props} viewport={this.state.viewport}/>
+    }
+
+    handleWindowResize() {
+      const { viewport } = this.state
+      if (viewport.width !== window.innerWidth || viewport.height !== window.innerHeight) {
+        this.setState({ viewport: { width: window.innerWidth, height: window.innerHeight } })
+      }    
+    }
   }
-}
-export function fetchItem(id) {
-  return (dispatch) => {
-    if (!id) return Promise.resolve();
-    return fetch(`/api/item/${id}`)
-        .then(res => res.json())
-        .then(json => dispatch({ type: 'FETCH_ITEM_SUCCESS', payload: json }));
-  }
-}
-isomorphic-fetch 是一个前后端通用的 Ajax 实现，前后端要共享代码这点很重要。
-另外因为涉及到异步请求，这里的 action 用到了 thunk，也就是函数，redux 通过 thunk-middleware 来处理这类 action，把函数当作普通的 action dispatch 就好了，比如 dispatch(fetchList())
-Store
-我们用一个独立的 ./store.js，配置（比如 Apply Middleware）生成 Store
-import { createStore } from 'redux';
-import rootReducer from './reducers';
-// Apply middleware here
-// ...
-export default function configureStore(initialState) {
-  const store = createStore(rootReducer, initialState);
-  return store;
 }
 
-react-redux
-接下来就是实现 <List>，<Item> 组件，然后把 Redux 和 React 组件关联起来，具体细节参见 react-redux
-./app.js
-import React from 'react';
-import { render } from 'react-dom';
-import { Router } from 'react-router';
-import createBrowserHistory from 'history/lib/createBrowserHistory';
-import { Provider } from 'react-redux';
-import routes from './routes';
-import configureStore from './store';
-// `__INITIAL_STATE__` 来自服务器端渲染，下一部分细说
-const initialState = window.__INITIAL_STATE__;
-const store = configureStore(initialState);
-const Root = (props) => {
-  return (
-    <div>
-      <Provider store={store}>
-        <Router history={createBrowserHistory()}>
-          {routes}
-        </Router>
-      </Provider>
-    </div>
-  );
-}
-render(<Root />, document.getElementById('root'));
-至此，客户端部分结束。
+*** 专业的实现参看 https://github.com/kriasoft/react-decorators ***
+那么，下面我们就可以创建出一个有机会响应窗口大小变化的 Input 组件：
+const SizeableInput = withViewport(Input)
+ReactDOM.render(<SizeableInput name="username" label="Username" {...props} />, mountNode)
+
+withViewort 作为一个 "高阶组件" 可不仅仅是为了 Input 服务的。它可以为你需要的任何组件添加上 viewport 属性，当窗口大小变化时，触发重绘。
+如果你用过 Redux，那么应该也熟悉 "connect decorator" 的用法。"connect decorator" 也是一个高阶组件，因此，你可以继续来“拼凑”：
+const UserNameInput = connect(
+  state => ({ value: state.username })
+)(SizeableInput)
+
+高阶组件的存在有两个好处：
+
+当写着写着无状态组件的时候，有一天忽然发现需要状态处理了，那么无需彻底返工:)
+往往我们需要状态的时候，这个需求是可以重用的，例如上面的 withViewport，今后可以用来给其他组件（无论是否是无状态组件）添加 viewport 属性。
+
+高阶组件加无状态组件，则大大增强了整个代码的可测试性和可维护性。同时不断“诱使”我们写出组合性更好的代码。
+无状态组件不支持 "ref"
+有一点遗憾的是无状态组件不支持 "ref"。原理很简单，因为在 React 调用到无状态组件的方法之前，是没有一个实例化的过程的，因此也就没有所谓的 "ref"。
+ref 和 findDOMNode 这个组合，实际上是打破了父子组件之间仅仅通过 props 来传递状态的约定，是危险且肮脏，需要避免。
+无状态组件尚不支持 babel-plugin-react-transform 的 Hot Module Replacement
+如果你是用 Webpack 以及 HMR，用 babel-plugin-react-transform 来做 jsx 转换等，那么当你在编辑器中修改无状态组件的源代码的时候，HMR 并不会在浏览器中自动载入修改后的代码。具体问题跟踪请参 https://github.com/gaearon/babel-plugin-react-transform/issues/57 。
+
+
+无状态组件还有以下几个显著的特点：
+
+1、组件不会被实例化，整体渲染性能得到提升
+因为组件被精简成一个render方法的函数来实现的，由于是无状态组件，所以无状态组件就不会在有组件实例化的过程，无实例化过程也就不需要分配多余的内存，从而性能得到一定的提升。
+2、组件不能访问this对象
+无状态组件由于没有实例化过程，所以无法访问组件this中的对象，例如：this.ref、this.state等均不能访问。若想访问就不能使用这种形式来创建组件
+3、组件无法访问生命周期的方法
+因为无状态组件是不需要组件生命周期管理和状态管理，所以底层实现这种形式的组件时是不会实现组件的生命周期方法。所以无状态组件是不能参与组件的各个生命周期管理的。
+4、无状态组件只能访问输入的props，同样的props会得到同样的渲染结果，不会有副作用
+无状态组件被鼓励在大型项目中尽可能以简单的写法来分割原本庞大的组件，未来React也会这种面向无状态组件在譬如无意义的检查和内存分配领域进行一系列优化，所以只要有可能，尽量使用无状态组件。

@@ -10,7 +10,6 @@ const Todo = (props)=>{
 }
 
 function mapStateToProps(state){
-    console.log(state);
     return {
         inputValue: state.inputValue
     }
@@ -23,7 +22,6 @@ function mapDispatchToProps(dispatch, ownProps){
             dispatch(action);
         },
         onAddItem:()=>{
-            console.log(ownProps);
             const action = getAddItemAction(ownProps.inputValue);
             dispatch(action);
         }
@@ -37,4 +35,6 @@ export default connect(mapStateToProps, mapDispatchToProps)(Todo);
 react-redux的mapDispatchToProps提供了第2个形参ownProps访问容器组件的props对象
 解决办法是这里不用无状态组件作UI组件，而是用class，然后不把mapDispatchToProps的onAddItem直接作为button的click回调，而是另外写一个回调，
 在这个回调中调用onAddItem，并传入input的值。
+另一种解决办法是，仍然使用UI组件，以及直接使用mapDispatchToProps的onAddItem直接作为button的click回调，但是，该回调中不再传入input的值，
+而是只发送一个该type的action，在reducer中直接访问store中保存的input的值
 */

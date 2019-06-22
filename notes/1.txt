@@ -157,6 +157,13 @@ webpack 搭建react工程踩坑：
 "react-redux": "^6.0.1"
 
 5、如果要热编译，安装webpack-dev-server，注意3.x的webpack建议用2.x的webpack-dev-server版本
+在webpack.config.js中添加如下参数（或者通过命令行传入）
+  devServer: {
+    contentBase: path.join(__dirname, "dist"),//本地服务器所加载的页面所在的目录
+    inline: true, //实时刷新
+    port: 9000, //端口改为9000
+    open:true // 自动打开浏览器
+  }
 6、如果要生成source map方便调试，在启动参数中添加 --devtool source-map
 7、注意去掉index.html模板中的图标引用，避免dev-server报无关的错误信息
   <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" />
