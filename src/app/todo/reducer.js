@@ -1,7 +1,7 @@
 import ActionTypes from "./actionTypes.js"
 
 var initState={
-    inputValue:"",
+    inputValue:"1234",
     todos:[]
 }
 export default (state=initState, action) => {

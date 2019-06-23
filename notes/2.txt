@@ -78,29 +78,22 @@ https://segmentfault.com/a/1190000015463599
 3.多次setState函数调用产生的效果会合并。
 
 重绘指的就是引起React的更新生命周期函数4个函数：
-
 shouldComponentUpdate（被调用时this.state没有更新；如果返回了false，生命周期被中断，虽然不调用之后的函数了，但是state仍然会被更新）
 componentWillUpdate（被调用时this.state没有更新）
 render（被调用时this.state得到更新）
 componentDidUpdate
+
 如果每一次setState调用都走一圈生命周期，光是想一想也会觉得会带来性能的问题，其实这四个函数都是纯函数，性能应该还好，但是render函数返回的结果会拿去做Virtual DOM比较和更新DOM树，这个就比较费时间。
 
 目前React会将setState的效果放在队列中，积攒着一次引发更新过程。
 为的就是把Virtual DOM和DOM树操作降到最小，用于提高性能。
 
 查阅一些资料后发现，某些操作还是可以同步更新this.state的。
-
 setState 什么时候会执行同步更新？
 先直接说结论吧：
 在React中，如果是由React引发的事件处理（比如通过onClick引发的事件处理），调用setState不会同步更新this.state，除此之外的setState调用会同步执行this.state。
 
-所谓“除此之外”，指的是绕过React通过
-addEventListener
-直接添加的事件处理函数，还有通过
-setTimeout || setInterval
-
-产生的异步调用。
-
+所谓“除此之外”，指的是绕过React通过 addEventListener直接添加的事件处理函数，还有通过 setTimeout || setInterval 产生的异步调用。
 简单一点说， 就是经过React 处理的事件是不会同步更新this.state的. 通过 addEventListener || setTimeout/setInterval 的方式处理的则会同步更新。
 具体可以参考 jsBin 的这个例子。
 
@@ -135,41 +128,6 @@ class Example extends React.Component {
 很显然，我们可以将4次setState简单规成两类：
 componentDidMount是一类
 setTimeOut中的又是一类，因为这两次在不同的调用栈中执行。
-
-表单
-
-表单不同于其他 HTML 元素，因为它要响应用户的交互，显示不同的状态，所以在 React 里面会有点特殊。
-状态属性
-表单元素有这么几种属于状态的属性：
-value，对应 <input> 和 <textarea> 所有
-checked，对应类型为 checkbox 和 radio 的 <input> 所有
-selected，对应 <option> 所有
-在 HTML 中 <textarea> 的值可以由子节点（文本）赋值，但是在 React 中，要用 value 来设置。
-表单元素包含以上任意一种状态属性都支持 onChange 事件监听状态值的更改。
-针对这些状态属性不同的处理策略，表单元素在 React 里面有两种表现形式。
-
-受控组件
-对于设置了上面提到的对应“状态属性“值的表单元素就是受控表单组件，比如：
-render: function() {
-    return <input type="text" value="hello"/>;
-}
-一个受控的表单组件，它所有状态属性更改涉及 UI 的变更都由 React 来控制（状态属性绑定 UI）。比如上面代码里的 <input> 输入框，用户输入内容，用户输入的内容不会显示（输入框总是显示状态属性 value 的值 hello），这有点颠覆我们的认知了，所以说这是受控组件，不是原来默认的表单元素了。
-如果你希望输入的内容反馈到输入框，就要用 onChange 事件改变状态属性 value 的值。
-
-非受控组件
-和受控组件相对，如果表单元素没有设置自己的“状态属性”，或者属性值设置为 null，这时候就是非受控组件。
-它的表现就符合普通的表单元素，正常响应用户的操作。
-同样，你也可以绑定 onChange 事件处理交互。如果你想要给“状态属性”设置默认值，就要用 React 提供的特殊属性 defaultValue，对于 checked 会有 defaultChecked，<option> 也是使用 defaultValue。
-
-select
-在 HTML 中 <select> 标签指定选中项都是通过对应 <option> 的 selected 属性来做的，但是在 React 修改成统一使用 value。
-所以没有一个 selected 的状态属性。
-<select value="B">
-    <option value="A">Apple</option>
-    <option value="B">Banana</option>
-    <option value="C">Cranberry</option>
-</select>
-你可以通过传递一个数组指定多个选中项：<select multiple={true} value={['B', 'C']}>
 
 React 有三种创建组件的方式：
 一、函数组件，也即无状态组件，有以下几个显著的特点：
@@ -345,3 +303,66 @@ function TestComp(props){
         </div>
     </div>)
 }
+
+
+受控组件
+设置了 value 的 <input> 是一个受控组件。 对于受控的 <input>，渲染出来的 HTML 元素始终保持 value 属性的值。如果想响应更新用户输入的值，就得使用 onChange 事件并调用 setState()改变状态属性 value 的值。这种由React控制的输入表单元素而改变其值的方式，称为：“受控组件”。
+
+例如常见的写法：
+handleNameChange(event) {
+	this.setState({ name: event.target.value });
+};
+render() {
+	return (
+		<div>
+			<input type="text" value={this.state.name} onChange={this.handleNameChange}/>
+		</div>
+	);
+}
+"受控"执行情况
+元素						属性					方法		方法回调中的新值
+<input type="text" />		value="string"			onChange	event.target.value
+<input type="checkbox" />	checked={boolean}		onChange	event.target.checked
+<input type="radio" />		checked={boolean}		onChange	event.target.checked
+<textarea />				value="string"			onChange	event.target.value
+<select />					value="option value"	onChange	event.target.value
+
+不受控组件
+没有设置 value(或者设为 null) 的 <input> 组件是一个非受控组件。对于非受控的 <input> 组件，渲染出来的元素直接反映用户输入。即其数据由DOM本身处理，不受setState()的控制（可使用 ref 从DOM获取表单值，不过不推荐）。和受控元素一样，使用 onChange 事件可以监听值的变化。
+
+如果想给组件设置一个非空的初始值，可以使用 defaultValue 属性。例如：
+render() {
+    return <input type="text" defaultValue="Default Value">
+}
+上面的代码渲染出来的元素和受控组件一样有一个初始值，但这个值用户可以改变并会反应到界面上。同样地， 类型为 radio、checkbox 的<input> 支持 defaultChecked 属性， <select> 支持 defaultValue 属性。
+render() {
+  return (
+	  <div>
+		<input type="radio" name="opt" defaultChecked /> Option 1
+		<input type="radio" name="opt" /> Option 2
+		<select defaultValue="C">
+		  <option value="A">Apple</option>
+		  <option value="B">Banana</option>
+		  <option value="C">Cranberry</option>
+		</select>
+	  </div>
+  );
+}
+需要注意的是，默认值只适用于第一次渲染，在重渲染阶段将不会适用。
+checkbox 和 radio 比较特殊， 如果在 onChange 事件中调用了 preventDefault ，那么浏览器不会更新 UI显示状态，即便事实上组件的state值已经改变了。
+
+此外，表单元素可以有如下几种状态属性：
+value，对应 <input> 和 <textarea> 所有
+checked，对应类型为 checkbox 和 radio 的 <input> 所有
+selected，对应 <option> 所有
+在 HTML 中 <select> 标签指定选中项都是通过对应 <option> 的 selected 属性来做的，但是在 React 修改成统一使用 value。
+所以没有一个 selected 的状态属性。
+<select value="B">
+    <option value="A">Apple</option>
+    <option value="B">Banana</option>
+    <option value="C">Cranberry</option>
+</select>
+你可以通过传递一个数组指定多个选中项：<select multiple={true} value={['B', 'C']}>
+
+结论
+受控和不受控元素都有其优点，根据具体情况选择。如果表单在UI反馈方面非常简单，则使用不受控组件。对于那些需求及时验证或检查的组件，则可以使用受控组件。

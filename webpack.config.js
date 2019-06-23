@@ -8,7 +8,7 @@ module.exports = {
     index: './src/index.js',
   },
   output: {
-    filename: '[name].bundle.js',
+    filename: '[name].[chunkhash:8].bundle.js',
     path: path.resolve(__dirname, 'dist')
   },
   module:{
@@ -26,9 +26,15 @@ module.exports = {
   plugins: [
     new CleanWebpackPlugin(),
     new HtmlWebpackPlugin({
-      title: '测试输入',
+      title: 'first-react',
       template: __dirname + '/public/index.html'
     })
     // new webpack.optimize.UglifyJsPlugin()
-  ]
+  ],
+  devServer: {
+    contentBase: path.join(__dirname, "dist"),//本地服务器所加载的页面所在的目录
+    inline: true, //实时刷新
+    port: 9000, //端口改为9000
+    open:true // 自动打开浏览器
+  }
 };
