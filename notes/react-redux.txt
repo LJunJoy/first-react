@@ -87,3 +87,14 @@ render(
   document.getElementById('root')
 )
 // 上面代码中，Provider在根组件外面包了一层，这样一来，App的所有子组件就默认都可以拿到state了。
+
+-> 添加托管文件
+git add .
+-> 查看文件状态
+git status
+-> 提交代码到本地仓库
+git commit -m '备注消息'
+-> 第一次提交代码到空的远端仓库
+git push -u origin master
+-> 提交代码到远端仓库
+git push origin master
